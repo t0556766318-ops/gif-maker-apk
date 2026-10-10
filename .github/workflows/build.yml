@@ -1,0 +1,32 @@
+name: Build APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.5'
+      - name: Prepare signing key
+        env:
+          KS_B64: ${{ secrets.KS_B64 }}
+          KS_PASS_IN: ${{ secrets.KS_PASS }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/ks.p12"
+            echo "KS_FILE=$RUNNER_TEMP/ks.p12" >> "$GITHUB_ENV"
+            echo "KS_PASS=$KS_PASS_IN" >> "$GITHUB_ENV"
+          fi
+      - run: gradle assembleRelease --no-daemon -PvCode=$((100 + ${{ github.run_number }}))
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gif-style-apk
+          path: app/build/outputs/apk/release/app-release.apk
