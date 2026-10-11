@@ -113,7 +113,7 @@ public class MainActivity extends Activity {
         if (code == PERM && res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED && pb64 != null) {
             doSave(pb64, pname);
         } else if (code == PERM2) {
-            if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED) loadGallery();
+            if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED) startGallery();
             else toast("אין הרשאה לגשת לתמונות");
         } else if (code == PERM) {
             toast("אין הרשאה לשמירה בתיקיית ההורדות");
@@ -161,10 +161,41 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> web.evaluateJavascript("gAdd(" + json + ")", null));
     }
 
-    private void loadGallery() {
+    private void startGallery() {
+        listFolders();
+        loadGallery(null);
+    }
+
+    private void listFolders() {
         new Thread(() -> {
             try (Cursor c = getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    new String[]{MediaStore.Images.Media._ID}, null, null, MediaStore.Images.Media.DATE_ADDED + " DESC")) {
+                    new String[]{MediaStore.Images.Media.BUCKET_ID, MediaStore.Images.Media.BUCKET_DISPLAY_NAME},
+                    null, null, MediaStore.Images.Media.DATE_ADDED + " DESC")) {
+                java.util.LinkedHashMap<String, Object[]> m = new java.util.LinkedHashMap<>();
+                while (c != null && c.moveToNext()) {
+                    String id = c.getString(0);
+                    String nm = c.getString(1);
+                    Object[] o = m.get(id);
+                    if (o == null) m.put(id, new Object[]{nm == null ? "?" : nm, 1});
+                    else o[1] = (Integer) o[1] + 1;
+                }
+                StringBuilder sb = new StringBuilder("[");
+                for (java.util.Map.Entry<String, Object[]> e : m.entrySet()) {
+                    if (sb.length() > 1) sb.append(',');
+                    sb.append("[\"").append(e.getKey()).append("\",\"")
+                      .append(String.valueOf(e.getValue()[0]).replace("\"", "").replace("\\", ""))
+                      .append("\",").append(e.getValue()[1]).append("]");
+                }
+                final String json = sb.append("]").toString();
+                runOnUiThread(() -> web.evaluateJavascript("gFolders(" + json + ")", null));
+            } catch (Exception e) { }
+        }).start();
+    }
+
+    private void loadGallery(final String bucket) {
+        new Thread(() -> {
+            try (Cursor c = getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    new String[]{MediaStore.Images.Media._ID}, bucket == null ? null : MediaStore.Images.Media.BUCKET_ID + "=?", bucket == null ? null : new String[]{bucket}, MediaStore.Images.Media.DATE_ADDED + " DESC")) {
                 StringBuilder sb = new StringBuilder("[");
                 int n = 0, tot = 0;
                 while (c != null && c.moveToNext() && tot < 300) {
@@ -199,8 +230,13 @@ public class MainActivity extends Activity {
             if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) {
                 runOnUiThread(() -> requestPermissions(new String[]{p}, PERM2));
             } else {
-                loadGallery();
+                startGallery();
             }
+        }
+
+        @JavascriptInterface
+        public void loadFolder(String id) {
+            loadGallery(id == null || id.isEmpty() ? null : id);
         }
 
         @JavascriptInterface
