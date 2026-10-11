@@ -1,0 +1,4 @@
+-keepattributes JavascriptInterface
+-keep class com.gifmaker.app.MainActivity$Bridge { *; }
+-keepclassmembers class com.gifmaker.app.MainActivity$Bridge { @android.webkit.JavascriptInterface <methods>; }
+-dontwarn **

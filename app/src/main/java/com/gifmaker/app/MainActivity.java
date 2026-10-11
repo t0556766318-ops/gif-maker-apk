@@ -2,6 +2,7 @@ package com.gifmaker.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.ClipData;
 import android.content.ContentUris;
 import android.database.Cursor;
@@ -54,6 +55,9 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         web = new WebView(this);
         setContentView(web);
+        try {
+            setTaskDescription(new ActivityManager.TaskDescription("גיף סטייל", BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher), 0xFF0D1B6B));
+        } catch (Exception e) { }
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -169,14 +173,14 @@ public class MainActivity extends Activity {
     private void listFolders() {
         new Thread(() -> {
             try (Cursor c = getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    new String[]{MediaStore.Images.Media.BUCKET_ID, MediaStore.Images.Media.BUCKET_DISPLAY_NAME},
+                    new String[]{MediaStore.Images.Media.BUCKET_ID, MediaStore.Images.Media.BUCKET_DISPLAY_NAME, MediaStore.Images.Media._ID},
                     null, null, MediaStore.Images.Media.DATE_ADDED + " DESC")) {
                 java.util.LinkedHashMap<String, Object[]> m = new java.util.LinkedHashMap<>();
                 while (c != null && c.moveToNext()) {
                     String id = c.getString(0);
                     String nm = c.getString(1);
                     Object[] o = m.get(id);
-                    if (o == null) m.put(id, new Object[]{nm == null ? "?" : nm, 1});
+                    if (o == null) m.put(id, new Object[]{nm == null ? "?" : nm, 1, c.getLong(2)});
                     else o[1] = (Integer) o[1] + 1;
                 }
                 StringBuilder sb = new StringBuilder("[");
@@ -184,12 +188,29 @@ public class MainActivity extends Activity {
                     if (sb.length() > 1) sb.append(',');
                     sb.append("[\"").append(e.getKey()).append("\",\"")
                       .append(String.valueOf(e.getValue()[0]).replace("\"", "").replace("\\", ""))
-                      .append("\",").append(e.getValue()[1]).append("]");
+                      .append("\",").append(e.getValue()[1]).append(",\"").append(thumbUri((Long) e.getValue()[2])).append("\"]");
                 }
                 final String json = sb.append("]").toString();
                 runOnUiThread(() -> web.evaluateJavascript("gFolders(" + json + ")", null));
             } catch (Exception e) { }
         }).start();
+    }
+
+    private String thumbUri(long id) {
+        try {
+            Bitmap bm;
+            if (Build.VERSION.SDK_INT >= 29) {
+                bm = getContentResolver().loadThumbnail(ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id), new Size(200, 200), null);
+            } else {
+                bm = MediaStore.Images.Thumbnails.getThumbnail(getContentResolver(), id, MediaStore.Images.Thumbnails.MINI_KIND, null);
+            }
+            if (bm == null) return "";
+            ByteArrayOutputStream o = new ByteArrayOutputStream();
+            bm.compress(Bitmap.CompressFormat.JPEG, 60, o);
+            return "data:image/jpeg;base64," + Base64.encodeToString(o.toByteArray(), Base64.NO_WRAP);
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private void loadGallery(final String bucket) {
@@ -282,7 +303,7 @@ public class MainActivity extends Activity {
                     StringBuilder sb = new StringBuilder("[");
                     for (ImageLabel l : ls) {
                         if (sb.length() > 1) sb.append(',');
-                        sb.append('"').append(l.getText().replace("\"", "")).append('"');
+                        sb.append("[\"").append(l.getText().replace("\"", "")).append("\",").append(l.getConfidence()).append("]");
                     }
                     sb.append("]");
                     web.evaluateJavascript("gLab('" + key + "'," + sb + ")", null);

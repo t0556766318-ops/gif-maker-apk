@@ -6,6 +6,7 @@
     <application
         android:label="גיף סטייל"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:theme="@style/AppTheme">
         <activity
