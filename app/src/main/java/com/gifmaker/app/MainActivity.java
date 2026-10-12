@@ -22,6 +22,7 @@ import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Size;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -59,6 +60,7 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         if (Build.VERSION.SDK_INT >= 29) s.setForceDark(WebSettings.FORCE_DARK_OFF);
         web.addJavascriptInterface(new Bridge(), "AndroidBridge");
+        web.setWebChromeClient(new WebChromeClient());
         final WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this)).build();
         web.setWebViewClient(new WebViewClient() {
