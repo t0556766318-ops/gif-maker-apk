@@ -15,6 +15,23 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.5'
+      - name: Download fonts
+        continue-on-error: true
+        run: |
+          pip install fonttools > /dev/null
+          mkdir -p app/src/main/assets/fonts
+          B=https://raw.githubusercontent.com/google/fonts/main/ofl
+          get() {
+            curl -fsSL "$B/$1" -o "/tmp/$2.ttf" && pyftsubset "/tmp/$2.ttf" --unicodes="U+0020-007E,U+00A0-00FF,U+0590-05FF,U+FB1D-FB4F,U+2013-2014,U+2018-201D,U+2022,U+2026,U+20AA" --flavor=woff --layout-features='kern' --no-hinting --output-file="app/src/main/assets/fonts/$2.woff" || echo "skipped $2"
+          }
+          get gveretlevin/GveretLevin-Regular.ttf hand
+          get 'playpensanshebrew/PlaypenSansHebrew%5Bwght%5D.ttf' play
+          get amaticsc/AmaticSC-Regular.ttf amatic
+          get karantina/Karantina-Regular.ttf karan
+          get secularone/SecularOne-Regular.ttf secular
+          get suezone/SuezOne-Regular.ttf suez
+          get rubikpixels/RubikPixels-Regular.ttf pix
+          get rubikdoodleshadow/RubikDoodleShadow-Regular.ttf doodle
       - name: Prepare signing key
         env:
           KS_B64: ${{ secrets.KS_B64 }}
