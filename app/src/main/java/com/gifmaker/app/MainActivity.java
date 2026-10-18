@@ -14,11 +14,13 @@ import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.media.ExifInterface;
 import android.media.MediaMetadataRetriever;
+import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.util.Base64;
 import android.util.Size;
 import android.webkit.JavascriptInterface;
@@ -42,7 +44,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 public class MainActivity extends Activity {
-    private static final int PERM = 2, PERM2 = 3;
+    private static final int PERM = 2, PERM2 = 3, REQ_ALL = 4;
+    private boolean askedAll;
     private static final String HOST = "appassets.androidplatform.net";
     private WebView web;
     private String pb64, pname;
@@ -123,9 +126,15 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
         boolean ok = res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED;
-        if (code == PERM && ok && pb64 != null) doSave(pb64, pname);
+        if (code == PERM && pb64 != null) doSave(pb64, pname);
         else if (code == PERM2 && ok) startGallery();
         else toast("אין הרשאה");
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        if (req == REQ_ALL && pb64 != null) doSave(pb64, pname);
+        else super.onActivityResult(req, res, data);
     }
 
     private void toast(final String m) {
@@ -133,23 +142,27 @@ public class MainActivity extends Activity {
     }
 
     private void doSave(String b64, String name) {
+        byte[] data = Base64.decode(b64, Base64.DEFAULT);
         try {
-            byte[] data = Base64.decode(b64, Base64.DEFAULT);
-            if (Build.VERSION.SDK_INT >= 29) {
-                ContentValues v = new ContentValues();
-                v.put(MediaStore.Images.Media.DISPLAY_NAME, name);
-                v.put(MediaStore.Images.Media.MIME_TYPE, "image/gif");
-                v.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/GIF STYLE");
-                Uri u = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
-                try (OutputStream o = getContentResolver().openOutputStream(u)) { o.write(data); }
-            } else {
-                File d = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "GIF STYLE");
-                d.mkdirs();
+            if (Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager()) {
+                File d = new File(Environment.getExternalStorageDirectory(), "GIF STYLE");
+                if (!d.exists() && !d.mkdirs()) throw new IOException("mkdirs");
                 File f = new File(d, name);
                 try (FileOutputStream o = new FileOutputStream(f)) { o.write(data); }
-                sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(f)));
+                MediaScannerConnection.scanFile(this, new String[]{f.getPath()}, new String[]{"image/gif"}, null);
+                toast("נשמר בתיקייה GIF STYLE: " + name);
+                return;
             }
-            toast("נשמר בתיקייה GIF STYLE: " + name);
+        } catch (Exception e) { }
+        try {
+            if (Build.VERSION.SDK_INT < 29) throw new IOException("no storage");
+            ContentValues v = new ContentValues();
+            v.put(MediaStore.Images.Media.DISPLAY_NAME, name);
+            v.put(MediaStore.Images.Media.MIME_TYPE, "image/gif");
+            v.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/GIF STYLE");
+            Uri u = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+            try (OutputStream o = getContentResolver().openOutputStream(u)) { o.write(data); }
+            toast("נשמר בתיקייה Pictures/GIF STYLE: " + name);
         } catch (Exception e) {
             toast("השמירה נכשלה: " + e.getMessage());
         }
@@ -322,10 +335,22 @@ public class MainActivity extends Activity {
     class Bridge {
         @JavascriptInterface
         public void saveGif(String b64, String name) {
-            if (Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT < 29
+            pb64 = b64;
+            pname = name;
+            if (Build.VERSION.SDK_INT >= 30 && !Environment.isExternalStorageManager() && !askedAll) {
+                askedAll = true;
+                runOnUiThread(() -> {
+                    toast("כדי לשמור בתיקייה GIF STYLE אשרו 'גישה לכל הקבצים' ואז חזרו לאפליקציה");
+                    try {
+                        startActivityForResult(new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + getPackageName())), REQ_ALL);
+                    } catch (Exception e) {
+                        doSave(pb64, pname);
+                    }
+                });
+                return;
+            }
+            if (Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT < 30
                     && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                pb64 = b64;
-                pname = name;
                 runOnUiThread(() -> requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERM));
                 return;
             }
