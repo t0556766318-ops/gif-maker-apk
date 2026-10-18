@@ -35,7 +35,9 @@ import androidx.webkit.WebViewAssetLoader;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
@@ -75,7 +77,12 @@ public class MainActivity extends Activity {
             }
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
-                return loader.shouldInterceptRequest(r.getUrl());
+                Uri u = r.getUrl();
+                if (HOST.equals(u.getHost()) && u.getPath() != null && u.getPath().startsWith("/video/")) {
+                    WebResourceResponse vr = serveVideo(u.getLastPathSegment(), r.getRequestHeaders());
+                    if (vr != null) return vr;
+                }
+                return loader.shouldInterceptRequest(u);
             }
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) { return handle(r.getUrl()); }
@@ -145,6 +152,54 @@ public class MainActivity extends Activity {
             toast("נשמר בתיקייה GIF STYLE: " + name);
         } catch (Exception e) {
             toast("השמירה נכשלה: " + e.getMessage());
+        }
+    }
+
+    private WebResourceResponse serveVideo(String id, java.util.Map<String, String> h) {
+        try {
+            Uri uri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, Long.parseLong(id));
+            final android.os.ParcelFileDescriptor pfd = getContentResolver().openFileDescriptor(uri, "r");
+            if (pfd == null) return null;
+            final long size = pfd.getStatSize();
+            String mime = getContentResolver().getType(uri);
+            if (mime == null) mime = "video/mp4";
+            long start = 0, end = size - 1;
+            String rg = h == null ? null : h.get("Range");
+            if (rg == null && h != null) rg = h.get("range");
+            boolean partial = false;
+            if (rg != null && rg.startsWith("bytes=")) {
+                String[] p = rg.substring(6).split("-", 2);
+                if (!p[0].isEmpty()) start = Long.parseLong(p[0]);
+                if (p.length > 1 && !p[1].isEmpty()) end = Long.parseLong(p[1]);
+                partial = true;
+            }
+            if (end >= size) end = size - 1;
+            final long len = end - start + 1;
+            final FileInputStream fis = new FileInputStream(pfd.getFileDescriptor());
+            fis.getChannel().position(start);
+            InputStream in = new InputStream() {
+                long left = len;
+                @Override public int read() throws IOException {
+                    if (left <= 0) return -1;
+                    int b = fis.read();
+                    if (b >= 0) left--;
+                    return b;
+                }
+                @Override public int read(byte[] b, int o, int l) throws IOException {
+                    if (left <= 0) return -1;
+                    int n = fis.read(b, o, (int) Math.min(l, left));
+                    if (n > 0) left -= n;
+                    return n;
+                }
+                @Override public void close() throws IOException { fis.close(); pfd.close(); }
+            };
+            java.util.HashMap<String, String> hd = new java.util.HashMap<>();
+            hd.put("Accept-Ranges", "bytes");
+            hd.put("Content-Length", String.valueOf(len));
+            if (partial) hd.put("Content-Range", "bytes " + start + "-" + end + "/" + size);
+            return new WebResourceResponse(mime, null, partial ? 206 : 200, partial ? "Partial Content" : "OK", hd, in);
+        } catch (Exception e) {
+            return null;
         }
     }
 
