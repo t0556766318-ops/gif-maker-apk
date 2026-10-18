@@ -46,6 +46,10 @@ public class MainActivity extends Activity {
     private String pb64, pname;
     private long exitAt;
     private volatile long gtoken;
+    private volatile boolean loading;
+    private java.util.ArrayList<long[]> curList = new java.util.ArrayList<>();
+    private int curPos;
+    private static final String BLANK = "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
     private MediaMetadataRetriever mmr;
     private int vw, vh;
 
@@ -126,19 +130,19 @@ public class MainActivity extends Activity {
             byte[] data = Base64.decode(b64, Base64.DEFAULT);
             if (Build.VERSION.SDK_INT >= 29) {
                 ContentValues v = new ContentValues();
-                v.put(MediaStore.Downloads.DISPLAY_NAME, name);
-                v.put(MediaStore.Downloads.MIME_TYPE, "image/gif");
-                v.put(MediaStore.Downloads.RELATIVE_PATH, "Download");
-                Uri u = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+                v.put(MediaStore.Images.Media.DISPLAY_NAME, name);
+                v.put(MediaStore.Images.Media.MIME_TYPE, "image/gif");
+                v.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/GIF STYLE");
+                Uri u = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
                 try (OutputStream o = getContentResolver().openOutputStream(u)) { o.write(data); }
             } else {
-                File d = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                File d = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "GIF STYLE");
                 d.mkdirs();
                 File f = new File(d, name);
                 try (FileOutputStream o = new FileOutputStream(f)) { o.write(data); }
                 sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(f)));
             }
-            toast("נשמר בתיקיית ההורדות: " + name);
+            toast("נשמר בתיקייה GIF STYLE: " + name);
         } catch (Exception e) {
             toast("השמירה נכשלה: " + e.getMessage());
         }
@@ -225,28 +229,39 @@ public class MainActivity extends Activity {
 
     private void loadMedia(final String kind, final String bucket) {
         final long token = ++gtoken;
+        loading = true;
         new Thread(() -> {
             try {
                 java.util.ArrayList<long[]> list = new java.util.ArrayList<>();
                 if (!kind.equals("v")) collect(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Images.Media.BUCKET_ID, bucket, 0, list);
                 if (!kind.equals("i")) collect(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.BUCKET_ID, bucket, 1, list);
                 java.util.Collections.sort(list, (a, b) -> Long.compare(b[2], a[2]));
-                StringBuilder sb = new StringBuilder("[");
-                int n = 0;
-                for (int i = 0; i < list.size() && i < 400; i++) {
-                    if (token != gtoken) return;
-                    long[] r = list.get(i);
-                    String t = thumbUri(r[0], r[1] == 1);
-                    if (t.isEmpty()) continue;
-                    if (n++ > 0) sb.append(',');
-                    sb.append('[').append(r[0]).append(",\"").append(t).append("\",").append(r[1]).append(',').append(r[3]).append(']');
-                    if (n == 30) { push(sb.append(']').toString()); sb = new StringBuilder("["); n = 0; }
-                }
-                if (n > 0 && token == gtoken) push(sb.append(']').toString());
+                if (token != gtoken) return;
+                curList = list;
+                curPos = 0;
+                pageOut(token, 90);
             } catch (Exception e) {
+                loading = false;
                 toast("טעינת הגלריה נכשלה: " + e.getMessage());
             }
         }).start();
+    }
+
+    private void pageOut(long token, int count) {
+        StringBuilder sb = new StringBuilder("[");
+        int n = 0, end = Math.min(curList.size(), curPos + count);
+        for (int i = curPos; i < end; i++) {
+            if (token != gtoken) { loading = false; return; }
+            long[] r = curList.get(i);
+            String t = thumbUri(r[0], r[1] == 1);
+            if (t.isEmpty()) t = BLANK;
+            if (n++ > 0) sb.append(',');
+            sb.append('[').append(r[0]).append(",\"").append(t).append("\",").append(r[1]).append(',').append(r[3]).append(']');
+            if (n == 30) { push(sb.append(']').toString()); sb = new StringBuilder("["); n = 0; }
+        }
+        if (n > 0) push(sb.append(']').toString());
+        if (token == gtoken) curPos = end;
+        loading = false;
     }
 
     class Bridge {
@@ -296,6 +311,15 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void loadMedia(String kind, String bucket) {
             MainActivity.this.loadMedia(kind, bucket);
+        }
+
+        @JavascriptInterface
+        public void moreMedia() {
+            if (!loading && curPos < curList.size()) {
+                loading = true;
+                final long t = gtoken;
+                new Thread(() -> pageOut(t, 90)).start();
+            }
         }
 
         @JavascriptInterface
