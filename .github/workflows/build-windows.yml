@@ -1,0 +1,40 @@
+name: Build Windows installer
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'windows-app/**'
+      - 'app/src/main/assets/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Windows app dependencies
+        working-directory: windows-app
+        run: npm install --no-audit --no-fund
+
+      - name: Build offline Windows installer
+        working-directory: windows-app
+        run: npm run dist:win
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: gif-style-windows-installer
+          path: windows-app/dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
