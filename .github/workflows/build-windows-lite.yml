@@ -1,0 +1,50 @@
+name: Build Windows Lite installer
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'windows-lite/**'
+      - 'app/src/main/assets/**'
+      - '.github/workflows/build-windows-lite.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-lite:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: 'windows-lite/src-tauri -> windows-lite/src-tauri/target'
+
+      - name: Install Tauri CLI
+        working-directory: windows-lite
+        run: npm install --no-audit --no-fund
+
+      - name: Build compact Windows installer
+        working-directory: windows-lite
+        run: npm run build:win
+
+      - name: Upload compact installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: gif-style-windows-lite-installer
+          path: windows-lite/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 14

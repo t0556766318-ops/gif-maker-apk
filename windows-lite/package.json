@@ -1,0 +1,13 @@
+{
+  "name": "gif-style-windows-lite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Compact offline GIF Style desktop edition using the Windows WebView2 runtime",
+  "scripts": {
+    "stage": "node stage-assets.cjs",
+    "build:win": "npm run stage && tauri build --bundles nsis"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

@@ -1,0 +1,14 @@
+[package]
+name = "gif-style-windows-lite"
+version = "1.0.0"
+description = "Compact offline Windows desktop edition of GIF Style"
+authors = ["GIF Style"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2" }
+
+[dependencies]
+base64 = "0.22"
+tauri = { version = "2" }
+tauri-plugin-dialog = "2"

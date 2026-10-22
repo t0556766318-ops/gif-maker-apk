@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "GIF Style Lite",
+  "version": "1.0.0",
+  "identifier": "com.gifstyle.desktoplite",
+  "build": {
+    "frontendDist": "../web"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "GIF Style Lite",
+        "width": 1240,
+        "height": 880,
+        "minWidth": 900,
+        "minHeight": 650,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "skip"
+      }
+    }
+  }
+}
