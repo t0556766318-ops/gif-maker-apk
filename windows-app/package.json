@@ -1,16 +1,13 @@
 {
   "name": "gif-style-windows",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Standalone offline Windows desktop edition of GIF Style",
   "private": true,
   "main": "main.cjs",
   "scripts": {
     "stage": "node stage-assets.cjs",
     "start": "npm run stage && electron .",
-    "dist:win": "npm run stage && electron-builder --win nsis --x64"
-  },
-  "dependencies": {
-    "ffmpeg-static": "5.2.0"
+    "dist:win": "npm run stage && electron-builder --win nsis --x64 --publish never"
   },
   "devDependencies": {
     "electron": "44.9.0",
@@ -23,9 +20,6 @@
       "output": "dist"
     },
     "asar": true,
-    "asarUnpack": [
-      "node_modules/ffmpeg-static/**"
-    ],
     "files": [
       "main.cjs",
       "preload.cjs",

@@ -3,10 +3,8 @@
 const { app, BrowserWindow, dialog, ipcMain, session } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
-const { execFileSync } = require("node:child_process");
 
 let mainWindow = null;
-let activeVideoPath = null;
 
 function safeFileName(input) {
   let name = path.basename(String(input || "gif-style.gif"));
@@ -52,59 +50,6 @@ ipcMain.on("save-gif", async (_event, payload) => {
   }
 });
 
-ipcMain.on("set-video-path", (_event, filePath) => {
-  if (typeof filePath === "string" && filePath.length < 32768 && fs.existsSync(filePath)) {
-    activeVideoPath = filePath;
-  }
-});
-
-ipcMain.on("video-open-current", (event) => {
-  event.returnValue = activeVideoPath && fs.existsSync(activeVideoPath) ? "ok" : "";
-});
-
-ipcMain.on("video-close", () => {
-  activeVideoPath = null;
-});
-
-ipcMain.on("video-frame", (event, rawMilliseconds) => {
-  event.returnValue = "";
-  try {
-    if (!activeVideoPath || !fs.existsSync(activeVideoPath)) return;
-
-    const milliseconds = Number(rawMilliseconds);
-    if (!Number.isFinite(milliseconds) || milliseconds < 0) return;
-
-    // ffmpeg-static is packaged with the installer; frame extraction stays local.
-    const ffmpegPath = require("ffmpeg-static");
-    if (!ffmpegPath || !fs.existsSync(ffmpegPath)) return;
-
-    const seconds = String(milliseconds / 1000);
-    const jpeg = execFileSync(ffmpegPath, [
-      "-hide_banner",
-      "-loglevel", "error",
-      "-ss", seconds,
-      "-i", activeVideoPath,
-      "-frames:v", "1",
-      "-an",
-      "-vf", "scale=480:480:force_original_aspect_ratio=decrease",
-      "-f", "image2pipe",
-      "-vcodec", "mjpeg",
-      "pipe:1"
-    ], {
-      windowsHide: true,
-      timeout: 25000,
-      maxBuffer: 32 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "ignore"]
-    });
-
-    if (jpeg && jpeg.length) {
-      event.returnValue = "data:image/jpeg;base64," + jpeg.toString("base64");
-    }
-  } catch (_error) {
-    event.returnValue = "";
-  }
-});
-
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1240,
@@ -131,7 +76,6 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, "web", "index.html"));
   mainWindow.on("closed", () => {
     mainWindow = null;
-    activeVideoPath = null;
   });
 }
 
