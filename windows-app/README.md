@@ -7,7 +7,7 @@ A separate Windows desktop project based on the existing GIF Style web interface
 - The UI, logo and fonts are bundled from `app/src/main/assets`.
 - The application blocks HTTP, HTTPS and WebSocket requests at runtime.
 - GIF saving uses a native Windows Save dialog.
-- Video frame extraction uses the built-in local Chromium video decoder and canvas; FFmpeg is not bundled.
+- The Windows UI has separate image and video pickers. Video frame extraction uses the built-in local Chromium video decoder and canvas; FFmpeg is not bundled.
 - The installed app is designed to work without an internet connection. Internet access is required only during the build to download Electron and build dependencies.
 
 ## Build on GitHub

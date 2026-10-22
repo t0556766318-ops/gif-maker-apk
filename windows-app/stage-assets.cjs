@@ -27,6 +27,14 @@ function replaceExactlyOnce(search, replacement, label) {
   html = html.slice(0, first) + replacement + html.slice(first + search.length);
 }
 
+// The Android build lists video items in its native gallery. Provide an equivalent
+// explicit local-video picker in the Windows desktop edition.
+replaceExactlyOnce(
+  '<button id="gbtn" class="big" type="button">📷 גלריה</button>',
+  '<button id="gbtn" class="big" type="button">📷 בחירת תמונות</button><button id="gif-style-video" class="ghost" style="width:100%;margin:0 0 10px" type="button">🎬 יצירת GIF מסרטון</button>',
+  "visible Windows video picker button"
+);
+
 // On Windows, the file picker supplies the local video. Use its metadata to
 // initialize the same trim controls that the Android gallery initializes.
 replaceExactlyOnce(
@@ -41,7 +49,7 @@ const helper = `function gifStyleDesktopFrame(video,seconds){return new Promise(
 
 replaceExactlyOnce(
   "$('vgo').onclick=async()=>",
-  helper + ";$('vgo').onclick=async()=>",
+  helper + ";$('gif-style-video').onclick=()=>$('vf').click();$('vgo').onclick=async()=>",
   "local video-frame helper insertion"
 );
 

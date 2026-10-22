@@ -1,6 +1,6 @@
 {
   "name": "gif-style-windows",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Standalone offline Windows desktop edition of GIF Style",
   "private": true,
   "main": "main.cjs",
