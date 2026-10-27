@@ -125,7 +125,8 @@ public class MainActivity extends Activity {
 
     @Override
     public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
-        boolean ok = res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED;
+        boolean ok = false;
+        for (int r : res) if (r == PackageManager.PERMISSION_GRANTED) ok = true;
         if (code == PERM && pb64 != null) doSave(pb64, pname);
         else if (code == PERM2 && ok) startGallery();
         else toast("אין הרשאה");
@@ -244,6 +245,8 @@ public class MainActivity extends Activity {
     }
 
     private void startGallery() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.READ_MEDIA_VIDEO") != PackageManager.PERMISSION_GRANTED)
+            toast("לא ניתנה הרשאה לסרטונים. אפשר לאשר אותה בהגדרות האפליקציה");
         listFolders();
         loadMedia("i", "");
     }
@@ -381,10 +384,15 @@ public class MainActivity extends Activity {
             final String[] p = Build.VERSION.SDK_INT >= 33
                     ? new String[]{"android.permission.READ_MEDIA_IMAGES", "android.permission.READ_MEDIA_VIDEO"}
                     : new String[]{Manifest.permission.READ_EXTERNAL_STORAGE};
-            if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(p[0]) != PackageManager.PERMISSION_GRANTED) {
-                runOnUiThread(() -> requestPermissions(p, PERM2));
-            } else {
+            java.util.ArrayList<String> need = new java.util.ArrayList<>();
+            if (Build.VERSION.SDK_INT >= 23) {
+                for (String q : p) if (checkSelfPermission(q) != PackageManager.PERMISSION_GRANTED) need.add(q);
+            }
+            if (need.isEmpty()) {
                 startGallery();
+            } else {
+                final String[] arr = need.toArray(new String[0]);
+                runOnUiThread(() -> requestPermissions(arr, PERM2));
             }
         }
 
